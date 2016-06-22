@@ -930,18 +930,22 @@ private:
 
     void Receive() const
     {
+		CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::Receive | -->";
       Binary::SecureHeader responseHeader;
       Stream >> responseHeader;
 
+	  CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::Receive | Done reading the responseHeader";
       size_t algo_size;
       if (responseHeader.Type == MessageType::MT_SECURE_OPEN )
       {
+		  CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::Receive | responseHeader type is SECURE OPEN";
         AsymmetricAlgorithmHeader responseAlgo;
         Stream >> responseAlgo;
         algo_size = RawSize(responseAlgo);
       }
       else if (responseHeader.Type == MessageType::MT_ERROR )
       {
+		  CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::Receive | responseHeader type is ERROR";
         StatusCode error;
         std::string msg;
         Stream >> error;
@@ -953,14 +957,17 @@ private:
       }
       else //(responseHeader.Type == MessageType::MT_SECURE_MESSAGE )
       {
+		  CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::Receive | responseHeader type is MESSAGE";
         Binary::SymmetricAlgorithmHeader responseAlgo;
         Stream >> responseAlgo;
         algo_size = RawSize(responseAlgo);
       }
 
+	  CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::Receive | reading responseSequence";
       Binary::SequenceHeader responseSequence;
       Stream >> responseSequence; // TODO Check for request Number
 
+	  CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::Receive | done reading responseSequence";
       const std::size_t expectedHeaderSize = RawSize(responseHeader) + algo_size + RawSize(responseSequence);
       if (expectedHeaderSize >= responseHeader.Size)
       {
@@ -970,7 +977,11 @@ private:
         throw std::runtime_error(stream.str());
       }
 
+	  CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::Receive | Done with responseHeader size check";
+	  CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::Receive | responseHeader size : " << responseHeader.Size;
+	  CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::Receive | expectedHeaderSize : " << expectedHeaderSize;
       const std::size_t dataSize = responseHeader.Size - expectedHeaderSize;
+	  CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::Receive | Data Size : " << dataSize;
       std::vector<char> buffer(dataSize);
       BufferInputChannel bufferInput(buffer);
       Binary::RawBuffer raw(&buffer[0], dataSize);
@@ -1004,9 +1015,13 @@ private:
 		CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::Receive | No callback found for message with id: " << id << " and handle " << header.RequestHandle << std::endl;
         return;
       }
+	  CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::Receive | Calling the next available callback method";
 	  callbackIt->second(std::move(buffer), std::move(header));
 
+	  CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::Receive | Removing the callback";
       Callbacks.erase(callbackIt);
+	  CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::Receive | Done with callback processing. removed the callback.";
+	  CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::Receive | <--";;
     }
 
     Binary::Acknowledge HelloServer(const SecureConnectionParams& params)
