@@ -15,6 +15,7 @@
 
 #include <memory>
 #include <string>
+#include "logging.hpp"
 
 namespace OpcUa
 {
@@ -27,6 +28,7 @@ namespace OpcUa
 
      virtual std::string GetHost() const = 0;
      virtual unsigned GetPort() const = 0;
+	 DECLARE_LOGGER
   };
 
 

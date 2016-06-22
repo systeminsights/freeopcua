@@ -38,6 +38,7 @@ OpcUa::SocketChannel::SocketChannel(int sock)
   setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, (char *) &flag, sizeof(int));
   if (Socket < 0)
   {
+	  CBOOST_LOG_SEV(mLogger, debug) << "SocketChannel::SocketChannel | cannot create channel - invalid socket";
     THROW_ERROR(CannotCreateChannelOnInvalidSocket);
   }
 }
@@ -52,6 +53,7 @@ void OpcUa::SocketChannel::Stop()
   int error = shutdown(Socket, 2);
   if (error < 0)
   {
+	  CBOOST_LOG_SEV(mLogger, debug) << "SocketChannel::Stop | Failed to close socket connection. " << strerror(errno);
     std::cerr << "Failed to close socket connection. " << strerror(errno) << std::endl;
   }
 }
@@ -61,10 +63,12 @@ std::size_t OpcUa::SocketChannel::Receive(char* data, std::size_t size)
   int received = recv(Socket, data, size, MSG_WAITALL);
   if (received < 0)
   {
+	  CBOOST_LOG_SEV(mLogger, debug) << "SocketChannel::Receive | Failed to receive data from host. Raising an exception";
     THROW_OS_ERROR("Failed to receive data from host.");
   }
   if (received == 0)
   {
+	  CBOOST_LOG_SEV(mLogger, debug) << "SocketChannel::Receive | Connection was closed by host. Raising an exception";
     THROW_OS_ERROR("Connection was closed by host.");
   }
   return (std::size_t)size;
@@ -75,6 +79,7 @@ void OpcUa::SocketChannel::Send(const char* message, std::size_t size)
   int sent = send(Socket, message, size, 0);
   if (sent != (int)size)
   {
+	  CBOOST_LOG_SEV(mLogger, debug) << "SocketChannel::Send | unable to send data to the host. raising an exception";
     THROW_OS_ERROR("unable to send data to the host. ");
   }
 }

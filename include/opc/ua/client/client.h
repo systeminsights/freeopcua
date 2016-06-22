@@ -30,7 +30,7 @@
 #include <condition_variable>
 #include <chrono>
 #include <atomic>
-
+#include "logging.hpp"
 
 namespace OpcUa
 {
@@ -55,6 +55,8 @@ namespace OpcUa
       std::condition_variable Condition;
       std::mutex Mutex;
       bool Debug = false;
+
+	  DECLARE_LOGGER
   };
 
 
@@ -169,6 +171,7 @@ namespace OpcUa
 
   protected:
     Services::SharedPtr Server;
+	DECLARE_LOGGER
 
   };
 

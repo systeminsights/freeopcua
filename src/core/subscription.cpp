@@ -51,26 +51,31 @@ namespace OpcUa
   {
 
     if (Debug){ std::cout << "Subscription | Suscription::PublishCallback called with " <<result.NotificationMessage.NotificationData.size() << " notifications " << std::endl; }
+	CBOOST_LOG_SEV(mLogger, debug) << "Subscription::PublishCallback called with " << result.NotificationMessage.NotificationData.size() << " notifications ";
     for (const NotificationData& data: result.NotificationMessage.NotificationData )
     {
       if (data.Header.TypeId == ExpandedObjectId::DataChangeNotification)
       {
         if (Debug) { std::cout << "Subscription | Notification is of type DataChange\n"; }
+		CBOOST_LOG_SEV(mLogger, debug) << "Subscription::PublishCallback | Notification is of type DataChange\n";
         CallDataChangeCallback(data);
       }
       else if (data.Header.TypeId == ExpandedObjectId::EventNotificationList)
       {
         if (Debug) { std::cout << "Subscription | Notification is of type Event\n"; }
+		CBOOST_LOG_SEV(mLogger, debug) << "Subscription::PublishCallback | Notification is of type Event";
         CallEventCallback(data);
       }
       else if (data.Header.TypeId == ExpandedObjectId::StatusChangeNotification)
       {
         if (Debug) { std::cout << "Subscription | Notification is of type StatusChange\n"; }
+		CBOOST_LOG_SEV(mLogger, debug) << "Subscription::PublishCallback | Notification is of type StatusChange";
         CallStatusChangeCallback(data);
       }
       else
       {
         std::cout << "Subscription | Error unknown notficiation type received: " << data.Header.TypeId <<std::endl;
+		CBOOST_LOG_SEV(mLogger, debug) << "Subscription::PublishCallback | Error unknown notification type received: "<< data.Header.TypeId;
       }
     }
     OpcUa::SubscriptionAcknowledgement ack;
@@ -91,6 +96,7 @@ namespace OpcUa
       if ( mapit == AttributeValueMap.end() )
       {
         std::cout << "Subscription | Server Error got publishresult for an unknown  monitoreditem id : "<< item.ClientHandle << std::endl; 
+		CBOOST_LOG_SEV(mLogger, debug) << "Subscription::CallDataChangeCallback | Server Error got publishresult for an unknown  monitoreditem id : " << item.ClientHandle;
       }
       else
       {
@@ -98,6 +104,7 @@ namespace OpcUa
         Node node = mapit->second.TargetNode;
         lock.unlock(); //unlock before calling client cades, you never know what they may do
         if (Debug) { std::cout << "Subscription | Debug: Calling DataChange user callback " << item.ClientHandle << " and node: " << mapit->second.TargetNode << std::endl; }
+		CBOOST_LOG_SEV(mLogger, debug) << "Subscription::CallDataChangeCallback | Calling DataChange user callback " << item.ClientHandle << " and node: " << mapit->second.TargetNode;
         Client.DataValueChange(mapit->second.MonitoredItemId, node, item.Value, attr);
         Client.DataChange(mapit->second.MonitoredItemId, node, item.Value.Value, attr);
       }
@@ -119,6 +126,7 @@ namespace OpcUa
       if ( mapit == AttributeValueMap.end() )
       {
         std::cout << "Subscription | Server Error got publishresult for an unknown  monitoreditem id : "<< ef.ClientHandle << std::endl; 
+		CBOOST_LOG_SEV(mLogger, debug) << "Subscription::CallEventCallback | Server Error got publishresult for an unknown  monitoreditem id : " << ef.ClientHandle;
       }
       else
       {
@@ -126,6 +134,7 @@ namespace OpcUa
         uint32_t count = 0;
         if ( mapit->second.Filter.Event.SelectClauses.size() != ef.EventFields.size() )
         {
+			CBOOST_LOG_SEV(mLogger, debug) << "Subscription::CallEventCallback | Error receive event format does not match requested filter. Raising an exception";
           throw std::runtime_error("Subscription | Error receive event format does not match requested filter");
         }
         for (SimpleAttributeOperand op : mapit->second.Filter.Event.SelectClauses )
@@ -176,8 +185,10 @@ namespace OpcUa
         }
         lock.unlock(); 
         if (Debug) { std::cout << "Subscription | Debug: Calling client event callback\n"; }
+		CBOOST_LOG_SEV(mLogger, debug) << "Subscription::CallEventCallback | calling client event callback";
         Client.Event(mapit->second.MonitoredItemId, ev);
         if (Debug) { std::cout << "Subscription | Debug: callback call finished\n"; }
+		CBOOST_LOG_SEV(mLogger, debug) << "Subscription::CallEventCallback | callback call finished";
       }
     }
   }
@@ -198,7 +209,10 @@ namespace OpcUa
     avid.AttributeId = attr;
     //avid.IndexRange //We leave it null, then the entire array is returned
     std::vector<uint32_t> results = SubscribeDataChange(std::vector<ReadValueId>({avid}));
-    if (results.size() != 1) { throw std::runtime_error("Subscription | Server error, SubscribeDataChange should have returned exactly one result"); }
+    if (results.size() != 1) { 
+		CBOOST_LOG_SEV(mLogger, debug) << "Subscription::SubscribeDataChange | Server error, SubscribeDataChange should have returned exactly one result. Raising an exception";
+		throw std::runtime_error("Subscription | Server error, SubscribeDataChange should have returned exactly one result"); 
+	}
     return results.front();
   }
 
@@ -243,6 +257,7 @@ namespace OpcUa
 
     if ( results.size() != attributes.size() ) 
     {
+		CBOOST_LOG_SEV(mLogger, debug) << "Subscription::SubscribeDataChange | Error server did not send answer for all monitoreditem requests. raising an exception";
       throw(std::runtime_error("Subscription | Error server did not send answer for all monitoreditem requests"));
     }
 
@@ -252,6 +267,7 @@ namespace OpcUa
     {
       CheckStatusCode(res.Status);
       if (Debug ) { std::cout << "Subscription | storing monitoreditem with handle " << itemsParams.ItemsToCreate[i].RequestedParameters.ClientHandle << " and id " << res.MonitoredItemId << std::endl;  }
+	  CBOOST_LOG_SEV(mLogger, debug) << "Subscription::SubscribeDataChange | storing monitoreditem with handle " << itemsParams.ItemsToCreate[i].RequestedParameters.ClientHandle << " and id " << res.MonitoredItemId;
       MonitoredItemData mdata; 
       mdata.MonitoredItemId = res.MonitoredItemId;
       mdata.Attribute =  attributes[i].AttributeId;
@@ -288,6 +304,7 @@ namespace OpcUa
     for (auto id : handles)
     {
       if (Debug) std::cout << "Subscription | Sending unsubscribe for monitoreditemsid: " << id << std::endl;
+	  CBOOST_LOG_SEV(mLogger, debug) << "Subscription::Unsubscribe | Sending unsubscribe for monitoreditemsid: " << id;
       mids.push_back(uint32_t(id));
       //Now trying to remove monitoreditem from our internal cache
       for ( auto pair : AttributeValueMap )
@@ -316,9 +333,11 @@ namespace OpcUa
   {
     EventFilter filter;
     if (Debug) std::cout << "Subscription | Subscribing events with filter for properties:" << std::endl;
+	CBOOST_LOG_SEV(mLogger, debug) << "Subscription::SubscribEvents | Subscribing events with filter for properties: ";
     for ( Node& child: eventtype.GetProperties() )
     {
       if (Debug) std::cout << "      property: "<< child.GetBrowseName() << std::endl;
+	  CBOOST_LOG_SEV(mLogger, debug) << "\tproperty: " << child.GetBrowseName();
       SimpleAttributeOperand op;
       op.TypeId = eventtype.GetId();
       op.Attribute = AttributeId::Value;
@@ -357,6 +376,7 @@ namespace OpcUa
     std::vector<MonitoredItemCreateResult> results =  Server->Subscriptions()->CreateMonitoredItems(itemsParams);
     if ( results.size()  != 1 )
     {
+		CBOOST_LOG_SEV(mLogger, debug) << "Subscription::SubscribeEvents | Protocol Error CreateMonitoredItems should return one result. raising an exception";
       throw(std::runtime_error("Subscription | Protocol Error CreateMonitoredItems should return one result"));
     }
 

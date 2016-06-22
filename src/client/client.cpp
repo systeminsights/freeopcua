@@ -37,15 +37,18 @@ namespace OpcUa
     Running = true;
     StopRequest = false;
     Thread = std::thread([this] { this->Run(); });
+	CBOOST_LOG_SEV(mLogger, debug) << "KeepAliveThread::Start | KeepAliveThread started";
   }
 
 
   void KeepAliveThread::Run()
   {
     if (Debug)  { std::cout << "KeepAliveThread | Starting." << std::endl; }
+	CBOOST_LOG_SEV(mLogger, debug) << "KeepAliveThread::Run | Starting.";
     while ( ! StopRequest )
     {
       if (Debug)  { std::cout << "KeepAliveThread | Sleeping for: " << (int64_t) ( Period * 0.7 )<< std::endl; }
+	  CBOOST_LOG_SEV(mLogger, debug) << "KeepAliveThread::Run | Sleeping for: " << (int64_t)(Period * 0.7);
       std::unique_lock<std::mutex> lock(Mutex);
       std::cv_status status = Condition.wait_for(lock, std::chrono::milliseconds( (int64_t) ( Period * 0.7) ));
       if (status == std::cv_status::no_timeout )
@@ -53,6 +56,7 @@ namespace OpcUa
         break;
       }
       if (Debug)  { std::cout << "KeepAliveThread | renewing secure channel " << std::endl; }
+	  CBOOST_LOG_SEV(mLogger, debug) << "KeepAliveThread::Run | renewing secure channel ";
       OpenSecureChannelParameters params;
       params.ClientProtocolVersion = 0;
       params.RequestType = SecurityTokenRequestType::Renew;
@@ -66,6 +70,7 @@ namespace OpcUa
       }
 
       if (Debug)  { std::cout << "KeepAliveThread | read a variable from address space to keep session open " << std::endl; }
+	  CBOOST_LOG_SEV(mLogger, debug)<<"KeepAliveThread::Run | read a variable from address space to keep session open ";
       NodeToRead.GetValue();
     }
     Running = false;
@@ -73,11 +78,13 @@ namespace OpcUa
     {
       std::cout << "KeepAliveThread | Stopped" << std::endl;
     }
+	CBOOST_LOG_SEV(mLogger, debug) << "KeepAliveThread::Run | Stopped";
   }
 
   void KeepAliveThread::Stop()
   {
     if (Debug)  { std::cout << "KeepAliveThread | Stopping." << std::endl; }
+	CBOOST_LOG_SEV(mLogger, debug) << "KeepAliveThread::Stop | Stopping.";
     StopRequest = true;
     Condition.notify_all();
     try
@@ -87,7 +94,7 @@ namespace OpcUa
     catch (std::system_error ex)
     {
       if (Debug) { std::cout << "KeepaliveThread | Exception thrown at attempt to join: " << ex.what() << std::endl; }
-	  throw ex;
+	  CBOOST_LOG_SEV(mLogger, debug) << "KeepaliveThread::Stop | Exception thrown at attempt to join: " << ex.what();
     }
   }
 
@@ -126,17 +133,21 @@ namespace OpcUa
   {
     std::vector<EndpointDescription> endpoints = GetServerEndpoints(endpoint);
     if (Debug)  { std::cout << "UaClient | Going through server endpoints and selected one we support" << std::endl; }
+	CBOOST_LOG_SEV(mLogger, debug) << "UaClient::SelectEndpoint | Going through server endpoints and selected one we support";
     Common::Uri uri(endpoint);
     bool has_login = !uri.User().empty();
     for ( EndpointDescription ed : endpoints)
     {
       if (Debug)  { std::cout << "UaClient | Examining endpoint: " << ed.EndpointUrl << " with security: " << ed.SecurityPolicyUri <<  std::endl; }
+	  CBOOST_LOG_SEV(mLogger, debug) << "UaClient::SelectEndpoint | Examining endpoint: " << ed.EndpointUrl << " with security: " << ed.SecurityPolicyUri;
       if ( ed.SecurityPolicyUri == "http://opcfoundation.org/UA/SecurityPolicy#None")
       {
         if (Debug)  { std::cout << "UaClient | Security policy is OK, now looking at user token" <<  std::endl; }
+		CBOOST_LOG_SEV(mLogger, debug) << "UaClient::SelectEndpoint | Security policy is OK, now looking at user token";
         if (ed.UserIdentityTokens.empty() )
         {
           if (Debug)  { std::cout << "UaClient | Server does not use user token, OK" <<  std::endl; }
+		  CBOOST_LOG_SEV(mLogger, debug) << "UaClient::SelectEndpoint | Server does not use user token, OK";
           return ed;
         }
         for (  UserTokenPolicy token : ed.UserIdentityTokens)
@@ -146,17 +157,20 @@ namespace OpcUa
             if (token.TokenType == UserTokenType::UserName)
             {
               if (Debug)  { std::cout << "UaClient | Endpoint selected " <<  std::endl; }
+			  CBOOST_LOG_SEV(mLogger, debug) << "UaClient::SelectEndpoint | Endpoint selected ";
               return ed;
             }
           }
           else if (token.TokenType == UserTokenType::Anonymous)
           {
             if (Debug)  { std::cout << "UaClient | Endpoint selected " <<  std::endl; }
+			CBOOST_LOG_SEV(mLogger, debug) << "UaClient::SelectEndpoint | Endpoint selected ";
             return ed;
           }
         }
       }
     }
+	CBOOST_LOG_SEV(mLogger, debug) << "UaClient::SelectEndpoint | No supported endpoints found on server. Throwing an exception.";
     throw std::runtime_error("No supported endpoints found on server");
   }
 
@@ -183,6 +197,7 @@ namespace OpcUa
 
 
     if (Debug)  { std::cout << "UaClient | Creating session ..." <<  std::endl; }
+	CBOOST_LOG_SEV(mLogger, debug) << "UaClient::Connect | Creating session ...";
     OpcUa::RemoteSessionParameters session;
     session.ClientDescription.ApplicationUri = ApplicationUri;
     session.ClientDescription.ProductUri = ProductUri;
@@ -196,8 +211,10 @@ namespace OpcUa
     CreateSessionResponse response = Server->CreateSession(session);
     CheckStatusCode(response.Header.ServiceResult);
     if (Debug)  { std::cout << "UaClient | Create session OK" <<  std::endl; }
+	CBOOST_LOG_SEV(mLogger, debug) << "UaClient::Connect | Create session OK";
 
     if (Debug)  { std::cout << "UaClient | Activating session ..." <<  std::endl; }
+	CBOOST_LOG_SEV(mLogger, debug) << "UaClient::Connect | Activating session ...";
     ActivateSessionParameters session_parameters;
     {
       //const SessionData &session_data = response.Session;
@@ -228,12 +245,14 @@ namespace OpcUa
         }
       }
       if(!user_identify_token_found) {
+		  CBOOST_LOG_SEV(mLogger, debug) << "UaClient::Connect | Cannot find suitable user identify token for session. Throwing exception.";
         throw std::runtime_error("Cannot find suitable user identify token for session");
       }
     }
     ActivateSessionResponse aresponse = Server->ActivateSession(session_parameters);
     CheckStatusCode(aresponse.Header.ServiceResult);
     if (Debug)  { std::cout << "UaClient | Activate session OK" <<  std::endl; }
+	CBOOST_LOG_SEV(mLogger, debug) << "UaClient::Connect | Activate session OK";
 
     if (response.Parameters.RevisedSessionTimeout > 0 && response.Parameters.RevisedSessionTimeout < DefaultTimeout  )
     {
@@ -279,6 +298,7 @@ namespace OpcUa
     {
       CloseSessionResponse response = Server->CloseSession();
       if (Debug) { std::cout << "CloseSession response is " << ToString(response.Header.ServiceResult) << std::endl; }
+	  CBOOST_LOG_SEV(mLogger, debug) << "UaClient::Disconnect | CloseSession response is " << ToString(response.Header.ServiceResult);
       CloseSecureChannel();
     }
     Server.reset(); //FIXME: check if we still need this
@@ -293,14 +313,20 @@ namespace OpcUa
 
   std::vector<std::string>  UaClient::GetServerNamespaces()
   {
-    if ( ! Server ) { throw std::runtime_error("Not connected");}
+	  if (!Server) { 
+		  CBOOST_LOG_SEV(mLogger, debug) << "UaClient::GetServerNamespaces | Throwing runtime exception \"Not connected\"";
+	  throw std::runtime_error("Not connected"); 
+	  }
     Node namespacearray(Server, ObjectId::Server_NamespaceArray);
     return namespacearray.GetValue().As<std::vector<std::string>>();;
   }
 
   uint32_t UaClient::GetNamespaceIndex(std::string uri)
   {
-    if ( ! Server ) { throw std::runtime_error("Not connected");}
+    if ( ! Server ) { 
+		CBOOST_LOG_SEV(mLogger, debug) << "UaClient::GetNamespaceIndex | Throwing runtime exception \"Not connected\"";
+		throw std::runtime_error("Not connected");
+	}
     Node namespacearray(Server, ObjectId::Server_NamespaceArray);
     std::vector<std::string> uris = namespacearray.GetValue().As<std::vector<std::string>>();;
     for ( uint32_t i=0; i<uris.size(); ++i)
@@ -310,6 +336,7 @@ namespace OpcUa
         return i;
       }
     }
+	CBOOST_LOG_SEV(mLogger, debug) << "UaClient::GetNamespaceIndex | Throwing exception \"Error namespace uri does not exists in server\"";
     throw(std::runtime_error("Error namespace uri does not exists in server"));
     //return -1;
   }
@@ -322,25 +349,37 @@ namespace OpcUa
 
   Node UaClient::GetNode(const NodeId& nodeId) const
   {
-    if ( ! Server ) { throw std::runtime_error("Not connected");}
+	  if (!Server) {
+		  CBOOST_LOG_SEV(mLogger, debug) << "UaClient::GetNode | Throwing runtime exception \"Not connected\"";
+		  throw std::runtime_error("Not connected");
+	  }
     return Node(Server, nodeId);
   }
 
   Node UaClient::GetRootNode() const
   {
-    if ( ! Server ) { throw std::runtime_error("Not connected");}
+	  if (!Server) {
+		  CBOOST_LOG_SEV(mLogger, debug) << "UaClient::GetRootNode | Throwing runtime exception \"Not connected\"";
+		  throw std::runtime_error("Not connected");
+	  }
     return Node(Server, OpcUa::ObjectId::RootFolder);
   }
 
   Node UaClient::GetObjectsNode() const
   {
-    if ( ! Server ) { throw std::runtime_error("Not connected");}
+	  if (!Server) {
+		  CBOOST_LOG_SEV(mLogger, debug) << "UaClient::GetObjectsNode | Throwing runtime exception \"Not connected\"";
+		  throw std::runtime_error("Not connected");
+	  }
     return Node(Server, OpcUa::ObjectId::ObjectsFolder);
   }
 
   Node UaClient::GetServerNode() const
   {
-    if ( ! Server ) { throw std::runtime_error("Not connected");}
+	  if (!Server) {
+		  CBOOST_LOG_SEV(mLogger, debug) << "UaClient::GetServerNode | Throwing runtime exception \"Not connected\"";
+		  throw std::runtime_error("Not connected");
+	  }
     return Node(Server, OpcUa::ObjectId::Server);
   }
 
@@ -352,6 +391,7 @@ namespace OpcUa
       nodes.insert(nodes.end(), children.begin(), children.end());
     }
     if (Debug)  { std::cout << "UaClient | Deleting nodes ..." <<  std::endl; }
+	CBOOST_LOG_SEV(mLogger, debug) << "UaClient::DeleteNodes | Deleting nodes ...";
     std::vector<OpcUa::DeleteNodesItem> nodesToDelete;
     nodesToDelete.resize(nodes.size());
     for (unsigned i = 0; i < nodes.size(); i++)

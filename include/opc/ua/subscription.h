@@ -29,6 +29,7 @@
 #include <mutex>
 
 #include <iostream> //debug
+#include "logging.hpp"
 
 namespace OpcUa
 {
@@ -136,7 +137,7 @@ namespace OpcUa
       //Request republish of a notification from server
       //SequenceNumber are send by server in PublishResult struct
       RepublishResponse Republish(uint32_t sequenceNumber);
-
+	  DECLARE_LOGGER
 
 
     private:

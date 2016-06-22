@@ -22,6 +22,7 @@
 #include <opc/ua/services/services.h>
 
 #include <sstream>
+#include "logging.hpp"
 
 
 namespace OpcUa
@@ -30,7 +31,11 @@ namespace OpcUa
   class NodeNotFoundException : public std::runtime_error 
   {
     public:
-      NodeNotFoundException() : std::runtime_error("NodeNotFoundException") { }
+      NodeNotFoundException() : std::runtime_error("NodeNotFoundException") 
+	  { 
+		  CBOOST_LOG_SEV(mLogger, debug) << "Node not found. Raising the exception.";
+	  }
+	  DECLARE_LOGGER
   };
 
   /// @brief A Node object represent an OPC-UA node.
@@ -127,6 +132,7 @@ namespace OpcUa
 
     //FIXME: I need this to create a copy for python binding, another way?
     OpcUa::Services::SharedPtr GetServices() const {return Server;}
+	DECLARE_LOGGER
 
   protected:
     OpcUa::Services::SharedPtr Server;

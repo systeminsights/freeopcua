@@ -17,6 +17,7 @@
 #include <opc/common/interface.h>
 #include <string>
 #include <vector>
+#include "logging.hpp"
 
 namespace Common
 {
@@ -83,6 +84,7 @@ namespace Common
 
     // @brief Stopping all addons;
     virtual void Stop() = 0;
+	DECLARE_LOGGER
   };
 
 

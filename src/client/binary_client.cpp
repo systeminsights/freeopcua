@@ -88,29 +88,62 @@ namespace
 
     void OnData(std::vector<char> data, ResponseHeader h)
     {
+		CBOOST_LOG_SEV(mLogger, debug) << "RequestCallback::OnData | -->";
       //PrintBlob(data);
+		CBOOST_LOG_SEV(mLogger, debug) << "RequestCallback::OnData | Data check";
+		if (data.size())
+		{
+			CBOOST_LOG_SEV(mLogger, debug) << "RequestCallback::OnData | Moving data";
       Data = std::move(data);
+			CBOOST_LOG_SEV(mLogger, debug) << "RequestCallback::OnData | Done moving data";
+		}
+		else
+		{
+			CBOOST_LOG_SEV(mLogger, debug) << "RequestCallback::OnData | Data size is 0";
+			Data = std::vector<char>();
+			CBOOST_LOG_SEV(mLogger, debug) << "RequestCallback::OnData | Set data to empty";
+		}
+		CBOOST_LOG_SEV(mLogger, debug) << "RequestCallback::OnData | Moving header";
 	  this->header = std::move(h);
+		CBOOST_LOG_SEV(mLogger, debug) << "RequestCallback::OnData | Done moving header";
+		CBOOST_LOG_SEV(mLogger, debug) << "RequestCallback::OnData | Notifying all the event listeners";
       doneEvent.notify_all();
+		CBOOST_LOG_SEV(mLogger, debug) << "RequestCallback::OnData | Done notifying all the event listeners";
+		CBOOST_LOG_SEV(mLogger, debug) << "RequestCallback::OnData | <--";
     }
 
     T WaitForData(std::chrono::milliseconds msec)
     {
+		CBOOST_LOG_SEV(mLogger, debug) << "RequestCallback::WaitForData | -->";
 	  if (doneEvent.wait_for(lock, msec) == std::cv_status::timeout)
-		  throw std::runtime_error("Response timed out");
+		{
+			CBOOST_LOG_SEV(mLogger, debug) << "RequestCallback::WaitForData | Throwing an exception \"Response timed out\"";
+			throw std::exception("Response timed out");
+		}
 
       T result;
+	  CBOOST_LOG_SEV(mLogger, debug) << "RequestCallback::WaitForData | Moving the header info";
 	  result.Header = std::move(this->header);
+	  CBOOST_LOG_SEV(mLogger, debug) << "RequestCallback::WaitForData | Done with moving the header info";
+
+	  CBOOST_LOG_SEV(mLogger, debug) << "RequestCallback::WaitForData | Reading the data";
       if ( Data.empty() )
       {
         std::cout << "Error: received empty packet from server" << std::endl;
+		CBOOST_LOG_SEV(mLogger, debug) << "RequestCallback::WaitForData | Error: received empty packet from server";
       }
 	  else
 	  {
+		  CBOOST_LOG_SEV(mLogger, debug) << "RequestCallback::WaitForData | BufferInputChannel";
 		  BufferInputChannel bufferInput(Data);
+		  CBOOST_LOG_SEV(mLogger, debug) << "RequestCallback::WaitForData | IStreamBinary";
 		  IStreamBinary in(bufferInput);
+		  CBOOST_LOG_SEV(mLogger, debug) << "RequestCallback::WaitForData | in >> result";
 		  in >> result;
+		  CBOOST_LOG_SEV(mLogger, debug) << "RequestCallback::WaitForData | Done...";
 	  }
+	  CBOOST_LOG_SEV(mLogger, debug) << "RequestCallback::WaitForData | Done reading the data";
+	  CBOOST_LOG_SEV(mLogger, debug) << "RequestCallback::WaitForData | <--";
       return result;
     }
 
@@ -120,6 +153,7 @@ namespace
     std::mutex m;
     std::unique_lock<std::mutex> lock;
     std::condition_variable doneEvent;
+	DECLARE_LOGGER
   };
 
   class CallbackThread
@@ -133,10 +167,12 @@ namespace
       void post(std::function<void()> callback)
       {
         if (Debug)  { std::cout << "binary_client| CallbackThread :  start post" << std::endl; }
+		CBOOST_LOG_SEV(mLogger, debug) << "CallbackThread::post | start post";
         std::unique_lock<std::mutex> lock(Mutex);
         Queue.push(callback);
         Condition.notify_one();
         if (Debug)  { std::cout << "binary_client| CallbackThread :  end post" << std::endl; }
+		CBOOST_LOG_SEV(mLogger, debug) << "CallbackThread::post | end post";
       }
 
       void Run()
@@ -144,22 +180,27 @@ namespace
         while (true)
         {
           if (Debug)  { std::cout << "binary_client| CallbackThread : waiting for next post" << std::endl; }
+		  CBOOST_LOG_SEV(mLogger, debug) << "CallbackThread::Run | waiting for next post";
           std::unique_lock<std::mutex> lock(Mutex);
           Condition.wait(lock, [&]() { return (StopRequest == true) || ( ! Queue.empty() ) ;} );
           if (StopRequest)
           {
             if (Debug)  { std::cout << "binary_client| CallbackThread : exited." << std::endl; }
+			CBOOST_LOG_SEV(mLogger, debug) << "CallbackThread::Run | exited";
             return;
           }
           while ( ! Queue.empty() ) //to avoid crashing on spurious events
           {
             if (Debug)  { std::cout << "binary_client| CallbackThread : condition has triggered copying callback and poping. queue size is  " << Queue.size() << std::endl; }
+			CBOOST_LOG_SEV(mLogger, debug) << "CallbackThread::Run | condition has triggered copying callback and poping. queue size is  " << Queue.size();
             std::function<void()> callbackcopy = Queue.front();
             Queue.pop();
             lock.unlock();
             if (Debug)  { std::cout << "binary_client| CallbackThread : now calling callback." << std::endl; }
+			CBOOST_LOG_SEV(mLogger, debug) << "CallbackThread::Run | now calling callback";
             callbackcopy();
             if (Debug)  { std::cout << "binary_client| CallbackThread : callback called." << std::endl; }
+			CBOOST_LOG_SEV(mLogger, debug) << "CallbackThread::Run | callback called";
             lock.lock();
           }
         }
@@ -168,6 +209,7 @@ namespace
       void Stop()
       {
         if (Debug)  { std::cout << "binary_client| CallbackThread : stopping." << std::endl; }
+		CBOOST_LOG_SEV(mLogger, debug) << "CallbackThread::Stop | stopping";
         StopRequest = true;
         Condition.notify_all();
       }
@@ -178,6 +220,8 @@ namespace
       std::condition_variable Condition;
       std::atomic<bool> StopRequest;
       std::queue<std::function<void()>> Queue;
+
+	  DECLARE_LOGGER
   };
 
   class BinaryClient
@@ -206,12 +250,16 @@ namespace
       , CallbackService(debug)
 
     {
+		CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::BinaryClient | Creating callback thread.";
       //Initialize the worker thread for subscriptions
       callback_thread = std::thread([&](){ CallbackService.Run(); });
 
+	  CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::BinaryClient | Call to HelloServer";
       HelloServer(params);
 
+	  CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::BinaryClient | Creating ReceiveThread";
       ReceiveThread = std::move(std::thread([this](){
+		  CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::BinaryClient | ReceiveThread started";
         try
         {
           while(!Finished)
@@ -220,6 +268,7 @@ namespace
         catch (const std::exception& exc)
         {
           if (Debug)  { std::cerr << "binary_client| CallbackThread : Error receiving data: "; }
+		  CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::BinaryClient | Error receiving data";
           std::cerr << exc.what() << std::endl;
         }
       }));
@@ -230,16 +279,21 @@ namespace
       Finished = true;
 
       if (Debug) std::cout << "binary_client| Stopping callback thread." << std::endl;
+	  CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::~BinaryClient | Stopping callback thread";
       CallbackService.Stop();
       if (Debug) std::cout << "binary_client| Joining service thread." << std::endl;
+	  CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::~BinaryClient | Joining service thread";
       callback_thread.join(); //Not sure it is necessary
 
       Channel->Stop();
       if (Debug) std::cout << "binary_client| Joining receive thread." << std::endl;
+	  CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::~BinaryClient | Joining receive thread";
       ReceiveThread.join();
       if (Debug) std::cout << "binary_client| Receive tread stopped." << std::endl;
+	  CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::~BinaryClient | Receive thread stopped";
 
       if (Debug) std::cout << "binary_client| Destroyed." << std::endl;
+	  CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::~BinaryClient | destroyed";
     }
 
     ////////////////////////////////////////////////////////////////
@@ -248,6 +302,7 @@ namespace
     virtual CreateSessionResponse CreateSession(const RemoteSessionParameters& parameters)
     {
       if (Debug)  { std::cout << "binary_client| CreateSession -->" << std::endl; }
+	  CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::CreateSession | Creating session";
       CreateSessionRequest request;
       request.Header = CreateRequestHeader();
 
@@ -269,44 +324,53 @@ namespace
       CreateSessionResponse response = Send<CreateSessionResponse>(request);
       AuthenticationToken = response.Parameters.AuthenticationToken;
       if (Debug)  { std::cout << "binary_client| CreateSession <--" << std::endl; }
+	  CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::CreateSession | Done creating session";
       return response;
     }
 
     ActivateSessionResponse ActivateSession(const ActivateSessionParameters &session_parameters) override
     {
       if (Debug)  { std::cout << "binary_client| ActivateSession -->" << std::endl; }
+	  CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::ActivateSession | -->";
       ActivateSessionRequest request;
       request.Parameters = session_parameters;
       request.Parameters.LocaleIds.push_back("en");
       ActivateSessionResponse response = Send<ActivateSessionResponse>(request);
       if (Debug)  { std::cout << "binary_client| ActivateSession <--" << std::endl; }
+	  CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::ActivateSession | <--";
       return response;
     }
 
     virtual CloseSessionResponse CloseSession()
     {
       if (Debug)  { std::cout << "binary_client| CloseSession -->" << std::endl; }
+	  CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::CloseSession | -->";
       CloseSessionRequest request;
       CloseSessionResponse response = Send<CloseSessionResponse>(request);
       RemoveSelfReferences();
       if (Debug)  { std::cout << "binary_client| CloseSession <--" << std::endl; }
+	  CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::CloseSession | <--";
       return response;
     }
 
     virtual void AbortSession()
     {
       if (Debug)  { std::cout << "binary_client| AbortSession -->" << std::endl; }
+	  CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::AbortSession | -->";
       RemoveSelfReferences();
       if (Debug)  { std::cout << "binary_client| AbortSession <--" << std::endl; }
+	  CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::AbortSession | <--";
     }
 
     DeleteNodesResponse DeleteNodes(const std::vector<OpcUa::DeleteNodesItem> &nodesToDelete) override
     {
       if (Debug)  { std::cout << "binary_client| DeleteNodes -->" << std::endl; }
+	  CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::DeleteNodes | -->";
       DeleteNodesRequest request;
       request.NodesToDelete = nodesToDelete;
       DeleteNodesResponse response = Send<DeleteNodesResponse>(request);
       if (Debug)  { std::cout << "binary_client| DeleteNodes <--" << std::endl; }
+	  CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::DeleteNodes | <--";
       return response;
     }
 
@@ -323,26 +387,34 @@ namespace
     {
       if (Debug)  {
         std::cout << "binary_client| Read -->" << std::endl;
+		CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::Read | -->";
+		CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::Read | reading the attributes";
         for ( ReadValueId attr : params.AttributesToRead )
         {
           std::cout << attr.NodeId << "  " << (uint32_t)attr.AttributeId;
+		  CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::Read | Attribute : " << attr.NodeId << "  " << (uint32_t)attr.AttributeId;
         }
         std::cout << std::endl;
+		CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::Read | Done with reading the attributes";
       }
       ReadRequest request;
       request.Parameters = params;
+	  CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::Read | Sending a request";
       const ReadResponse response = Send<ReadResponse>(request);
       if (Debug)  { std::cout << "binary_client| Read <--" << std::endl; }
+	  CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::Read | <--";
       return response.Results;
     }
 
     virtual std::vector<OpcUa::StatusCode> Write(const std::vector<WriteValue>& values)
     {
       if (Debug)  { std::cout << "binary_client| Write -->" << std::endl; }
+	  CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::Write | -->";
       WriteRequest request;
       request.Parameters.NodesToWrite = values;
       const WriteResponse response = Send<WriteResponse>(request);
       if (Debug)  { std::cout << "binary_client| Write <--" << std::endl; }
+	  CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::Write | <--";
       return response.Results;
     }
 
@@ -357,16 +429,19 @@ namespace
     virtual std::vector<ApplicationDescription> FindServers(const FindServersParameters& params) const
     {
       if (Debug)  { std::cout << "binary_client| FindServers -->" << std::endl; }
+	  CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::FindServers | -->";
       OpcUa::FindServersRequest request;
       request.Parameters = params;
       FindServersResponse response = Send<FindServersResponse>(request);
       if (Debug)  { std::cout << "binary_client| FindServers <--" << std::endl; }
+	  CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::FindServers | <--";
       return response.Data.Descriptions;
     }
 
     virtual std::vector<EndpointDescription> GetEndpoints(const GetEndpointsParameters& filter) const
     {
       if (Debug)  { std::cout << "binary_client| GetEndpoints -->" << std::endl; }
+	  CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::GetEndPoints | -->";
       OpcUa::GetEndpointsRequest request;
       request.Header = CreateRequestHeader();
       request.Parameters.EndpointUrl = filter.EndpointUrl;
@@ -374,6 +449,7 @@ namespace
       request.Parameters.ProfileUris = filter.ProfileUris;
       const GetEndpointsResponse response = Send<GetEndpointsResponse>(request);
       if (Debug)  { std::cout << "binary_client| GetEndpoints <--" << std::endl; }
+	  CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::GetEndPoints | <--";
       return response.Endpoints;
     }
 
@@ -392,10 +468,12 @@ namespace
     virtual std::vector<CallMethodResult> Call(const std::vector<CallMethodRequest>& methodsToCall)
     {
       if (Debug) {std::cout << "binary_clinent | Call -->" << std::endl;}
+	  CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::Call | -->";
       CallRequest request;
       request.MethodsToCall = methodsToCall;
       const CallResponse response = Send<CallResponse>(request);
       if (Debug) {std::cout << "binary_clinent | Call <--" << std::endl;}
+	  CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::Call | <--";
       // Manage errors
 //       if (!response.DiagnosticInfos.empty())
 //       {
@@ -416,20 +494,24 @@ namespace
     virtual std::vector<AddNodesResult> AddNodes(const std::vector<AddNodesItem>& items)
     {
       if (Debug)  { std::cout << "binary_client| AddNodes -->" << std::endl; }
+	  CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::AddNodes | -->";
       AddNodesRequest request;
       request.Parameters.NodesToAdd = items;
       const AddNodesResponse response = Send<AddNodesResponse>(request);
       if (Debug)  { std::cout << "binary_client| AddNodes <--" << std::endl; }
+	  CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::AddNodes | <--";
       return response.results;
     }
 
     virtual std::vector<StatusCode> AddReferences(const std::vector<AddReferencesItem>& items)
     {
       if (Debug)  { std::cout << "binary_client| AddReferences -->" << std::endl; }
+	  CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::AddReferences | -->";
       AddReferencesRequest request;
       request.Parameters.ReferencesToAdd = items;
       const AddReferencesResponse response = Send<AddReferencesResponse>(request);
       if (Debug)  { std::cout << "binary_client| AddReferences <--" << std::endl; }
+	  CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::AddReferences | <--";
       return response.Results;
     }
 
@@ -444,52 +526,63 @@ namespace
     virtual SubscriptionData CreateSubscription(const CreateSubscriptionRequest& request, std::function<void (PublishResult)> callback)
     {
       if (Debug)  { std::cout << "binary_client| CreateSubscription -->" << std::endl; }
+	  CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::CreateSubscription | -->";
       const CreateSubscriptionResponse response = Send<CreateSubscriptionResponse>(request);
       if (Debug) std::cout << "BinaryClient | got CreateSubscriptionResponse" << std::endl;
+	  CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::CreateSubscription | got CreateSubscriptionResponse";
       PublishCallbacks[response.Data.SubscriptionId] = callback;// TODO Pass calback to the Publish method.
       if (Debug)  { std::cout << "binary_client| CreateSubscription <--" << std::endl; }
+	  CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::CreateSubscription | <--";
       return response.Data;
     }
 
     virtual std::vector<StatusCode> DeleteSubscriptions(const std::vector<uint32_t>& subscriptions)
     {
       if (Debug)  { std::cout << "binary_client| DeleteSubscriptions -->" << std::endl; }
+	  CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::DeleteSubscription | -->";
       DeleteSubscriptionsRequest request;
       request.SubscriptionIds = subscriptions;
       const DeleteSubscriptionsResponse response = Send<DeleteSubscriptionsResponse>(request);
       if (Debug)  { std::cout << "binary_client| DeleteSubscriptions <--" << std::endl; }
+	  CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::DeleteSubscription | <--";
       return response.Results;
     }
 
     virtual std::vector<MonitoredItemCreateResult> CreateMonitoredItems(const MonitoredItemsParameters& parameters)
     {
       if (Debug)  { std::cout << "binary_client| CreateMonitoredItems -->" << std::endl; }
+	  CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::CreateMonitoredItems | -->";
       CreateMonitoredItemsRequest request;
       request.Parameters = parameters;
       const CreateMonitoredItemsResponse response = Send<CreateMonitoredItemsResponse>(request);
       if (Debug)  { std::cout << "binary_client| CreateMonitoredItems <--" << std::endl; }
+	  CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::CreateMonitoredItems | <--";
       return response.Results;
     }
 
     virtual std::vector<StatusCode> DeleteMonitoredItems(const DeleteMonitoredItemsParameters& params)
     {
       if (Debug)  { std::cout << "binary_client| DeleteMonitoredItems -->" << std::endl; }
+	  CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::DeleteMonitoredItems | -->";
       DeleteMonitoredItemsRequest request;
       request.Parameters = params;
       const DeleteMonitoredItemsResponse response = Send<DeleteMonitoredItemsResponse>(request);
       if (Debug)  { std::cout << "binary_client| DeleteMonitoredItems <--" << std::endl; }
+	  CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::DeleteMonitoredItems | <--";
       return response.Results;
     }
 
     virtual void Publish(const PublishRequest& originalrequest)
     {
       if (Debug) {std::cout << "binary_client| Publish -->" << "request with " << originalrequest.SubscriptionAcknowledgements.size() << " acks" << std::endl;}
+	  CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::Publish | -->" << "request with " << originalrequest.SubscriptionAcknowledgements.size() << " acks";
       PublishRequest request(originalrequest);
       request.Header = CreateRequestHeader();
       request.Header.Timeout = 0; //We do not want the request to timeout!
 
       ResponseCallback responseCallback = [this](std::vector<char> buffer, ResponseHeader h){
         if (Debug) {std::cout << "BinaryClient | Got Publish Response, from server " << std::endl;}
+		CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::Publish | Got publish response from server";
 		PublishResponse response;
 		if (h.ServiceResult != OpcUa::StatusCode::Good)
 		{
@@ -507,10 +600,12 @@ namespace
 			if (response.Header.ServiceResult == OpcUa::StatusCode::Good)
 			{
 				if (Debug) { std::cout << "BinaryClient | Calling callback for Subscription " << response.Parameters.SubscriptionId << std::endl; }
+				CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::Publish | Calling callback for Subscription " << response.Parameters.SubscriptionId;
 				SubscriptionCallbackMap::const_iterator callbackIt = this->PublishCallbacks.find(response.Parameters.SubscriptionId);
 				if (callbackIt == this->PublishCallbacks.end())
 				{
 					std::cout << "BinaryClient | Error Unknown SubscriptionId " << response.Parameters.SubscriptionId << std::endl;
+					CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::Publish | Error Unknown SubscriptionId " << response.Parameters.SubscriptionId;
 				}
 				else
 				{
@@ -519,6 +614,7 @@ namespace
 					}
 					catch (const std::exception& ex)
 					{
+						CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::Publish | Error calling application callback " << ex.what();
 						std::cout << "Error calling application callback " << ex.what() << std::endl;
 					}
 				}
@@ -529,6 +625,8 @@ namespace
 				{
 					std::cout << "BinaryClient | Session is closed";
 				}
+				CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::Publish | Throwing an exception \"Session is closed\"";
+				throw  std::runtime_error("BadSession: Session Closed");
 			}
 			else
 			{
@@ -541,17 +639,20 @@ namespace
 	  lock.unlock();
 	  Send(request);
 	  if (Debug) { std::cout << "binary_client| Publish  <--" << std::endl; }
+	  CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::Publish | <--";
 	}
 
 	virtual RepublishResponse Republish(const RepublishParameters& params)
 	{
 		if (Debug) { std::cout << "binary_client| Republish -->" << std::endl; }
+		CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::Republish | -->";
 		RepublishRequest request;
 		request.Header = CreateRequestHeader();
 		request.Parameters = params;
 
 		RepublishResponse response = Send<RepublishResponse>(request);
 		if (Debug) { std::cout << "binary_client| Republish  <--" << std::endl; }
+		CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::Republish | <--";
 		return response;
 	}
 
@@ -566,17 +667,20 @@ namespace
 	virtual std::vector<BrowsePathResult> TranslateBrowsePathsToNodeIds(const TranslateBrowsePathsParameters& params) const
 	{
 		if (Debug)  { std::cout << "binary_client| TranslateBrowsePathsToNodeIds -->" << std::endl; }
+		CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::TranslateBrowsePathsToNodeIds | -->";
 		TranslateBrowsePathsToNodeIdsRequest request;
 		request.Header = CreateRequestHeader();
 		request.Parameters = params;
 		const TranslateBrowsePathsToNodeIdsResponse response = Send<TranslateBrowsePathsToNodeIdsResponse>(request);
 		if (Debug)  { std::cout << "binary_client| TranslateBrowsePathsToNodeIds <--" << std::endl; }
+		CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::TranslateBrowsePathsToNodeIds | <--";
 		return response.Result.Paths;
 	}
 
 
 	virtual std::vector<BrowseResult> Browse(const OpcUa::NodesQuery& query) const
 	{
+		CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::Browse | -->";
 		if (Debug)  {
 			std::cout << "binary_client| Browse -->";
 			for (BrowseDescription desc : query.NodesToBrowse)
@@ -598,6 +702,7 @@ namespace
 			}
 		}
 		if (Debug)  { std::cout << "binary_client| Browse <--" << std::endl; }
+		CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::Browse | <--";
 		return  response.Results;
 	}
 
@@ -606,10 +711,12 @@ namespace
 		//FIXME: fix method interface so we do not need to decice arbitriraly if we need to send BrowseNext or not...
 		if (ContinuationPoints.empty())
 		{
+			CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::BrowseNext | No continuation point, no need to send browse next request";
 			if (Debug)  { std::cout << "No Continuation point, no need to send browse next request" << std::endl; }
 			return std::vector<BrowseResult>();
 		}
 		if (Debug)  { std::cout << "binary_client| BrowseNext -->" << std::endl; }
+		CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::BrowseNext | -->";
 		BrowseNextRequest request;
 		request.ReleaseContinuationPoints = ContinuationPoints.empty() ? true : false;
 		request.ContinuationPoints = ContinuationPoints;
@@ -623,16 +730,19 @@ namespace
 			}
 		}
 		if (Debug)  { std::cout << "binary_client| BrowseNext <--" << std::endl; }
+		CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::BrowseNext | <--";
 		return response.Results;
 	}
 
 	std::vector<NodeId> RegisterNodes(const std::vector<NodeId>& params) const
 	{
+		CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::RegisterNodes | --> Nodes to register";
 		if (Debug)
 		{
 			std::cout << "binary_clinet| RegisterNodes -->\n\tNodes to register:" << std::endl;
 			for (auto& param : params) {
 				std::cout << "\t\t" << param << std::endl;
+				CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::RegisterNodes | \t\t" << param;
 			}
 		}
 
@@ -640,11 +750,13 @@ namespace
 
 		request.NodesToRegister = params;
 		RegisterNodesResponse response = Send<RegisterNodesResponse>(request);
+		CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::RegisterNodes | <-- Registered NodeIds";
 		if (Debug)
 		{
 			std::cout << "binary_client| RegisterNodes <--\n\tRegistered NodeIds:" << std::endl;
 			for (auto&id : response.Result) {
 				std::cout << "\t\t" << id << std::endl;
+				CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::RegisterNodes | \t\t" << id;
 			}
 		}
 		return response.Result;
@@ -652,10 +764,12 @@ namespace
 
 	void UnregisterNodes(const std::vector<NodeId>& params) const
 	{
+		CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::UnregisterNodes | --> unregistering nodes";
 		if (Debug) {
 			std::cout << "binary_client| UnregisterNodes -->\n\tUnregistering nodes:" << std::endl;
 			for (auto& id : params) {
 				std::cout << "\t\t" << id << std::endl;
+				CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::UnregisterNodes | \t\t" << id;
 			}
 		}
 
@@ -666,6 +780,7 @@ namespace
 		if (Debug) {
 			std::cout << "binary_client| UnregisterNodes <--" << std::endl;
 		}
+		CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::UnregisterNodes | <--";
 	}
 
   private:
@@ -683,6 +798,7 @@ namespace
     ////////////////////////////////////////////////////////////////
     virtual OpcUa::OpenSecureChannelResponse OpenSecureChannel(const OpenSecureChannelParameters& params)
     {
+		CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::OpenSecureChannel | -->";
       if (Debug) {std::cout << "binary_client| OpenChannel -->" << std::endl;}
 
       OpenSecureChannelRequest request;
@@ -693,6 +809,7 @@ namespace
       ChannelSecurityToken = response.ChannelSecurityToken; //Save security token, we need it
 
       if (Debug) {std::cout << "binary_client| OpenChannel <--" << std::endl;}
+	  CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::OpenSecureChannel | <--";
       return response;
     }
 
@@ -700,6 +817,7 @@ namespace
     {
       try
       {
+		  CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::CloseSecureChannel | -->";
         if (Debug) {std::cout << "binary_client| CloseSecureChannel -->" << std::endl;}
         SecureHeader hdr(MT_SECURE_CLOSE, CHT_SINGLE, ChannelSecurityToken.SecureChannelId);
 
@@ -715,42 +833,77 @@ namespace
 
         Stream << hdr << algorithmHeader << sequence << request << flush;
         if (Debug) {std::cout << "binary_client| Secure channel closed." << std::endl;}
+		CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::CloseSecureChannel | secure channel closed";
       }
       catch (const std::exception& exc)
       {
+		  CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::CloseSecureChannel | closing secure channel failed with error: " << exc.what();
         std::cerr << "Closing secure channel failed with error: " << exc.what() << std::endl;
       }
       if (Debug) {std::cout << "binary_client| CloseSecureChannel <--" << std::endl;}
+	  CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::CloseSecureChannel | <--";
     }
 
 private:
     template <typename Response, typename Request>
     Response Send(Request request) const
     {
+		CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::Send | -->";
       request.Header = CreateRequestHeader();
+	  CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::Send | Done with CreateRequestHeader";
 
       RequestCallback<Response> requestCallback;
       ResponseCallback responseCallback = [&requestCallback](std::vector<char> buffer, ResponseHeader h){
+		  FILE *file = fopen("responseCallback.txt", "a");
+		  fprintf(file, "calling on Data -->\n");
         requestCallback.OnData(std::move(buffer), std::move(h));
+		  fprintf(file, "calling on Data <--\n");
+		  fclose(file);
       };
+	  CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::Send | Done with responseCallback";
       std::unique_lock<std::mutex> lock(Mutex);
       Callbacks.insert(std::make_pair(request.Header.RequestHandle, responseCallback));
       lock.unlock();
-
-      Send(request);
+	  CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::Send | Added request handle to the Callbacks collection";
 
 	  Response res;
+
+	  do
+	  {
+		  try{
+			  CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::Send | Calling Send(request)";
+      Send(request);
+			  CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::Send | Done calling Send(request)";
+		  }
+		  catch (std::exception &ex)
+		  {
+			  //Remove it on failed to sedn data to host
+			  std::unique_lock<std::mutex> lock(Mutex);
+			  Callbacks.erase(request.Header.RequestHandle);
+			  lock.unlock();
+
+			  CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::Send | Exception occured in Send(request): " << ex.what();
+			  std::cout << "std::exception occured. Info : " << ex.what();
+			  break;
+		  }
+
 	  try {
+			  CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::Send | Calling WaitForData";
       res = requestCallback.WaitForData(std::chrono::milliseconds(request.Header.Timeout));
+			  CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::Send | Done calling WaitForData";
 	  }
 	  catch (std::exception &ex)
 	  {
-		  //Remove the callback on timeout
+			  CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::Send | WaitForData exception occured. Removing the callback";
+			  //Remove it on timeout
 		  std::unique_lock<std::mutex> lock(Mutex);
 		  Callbacks.erase(request.Header.RequestHandle);
 		  lock.unlock();
 	  }
 
+		  break;
+	  } while (false);
+	  CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::Send | <--";
 	  return res;
     }
 
@@ -795,6 +948,7 @@ private:
         Stream >> msg;
         std::stringstream stream;
         stream << "Received error message from server: " << ToString(error) << ", " << msg ;
+		CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::Receive | Received error message from server: " << ToString(error) << ", " << msg;
         throw std::runtime_error(stream.str());
       }
       else //(responseHeader.Type == MessageType::MT_SECURE_MESSAGE )
@@ -812,6 +966,7 @@ private:
       {
         std::stringstream stream;
         stream << "Size of received message " << responseHeader.Size << " bytes is invalid. Expected size " << expectedHeaderSize << " bytes";
+		CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::Receive | Size of received message " << responseHeader.Size << " bytes is invalid.Expected size " << expectedHeaderSize << " bytes";
         throw std::runtime_error(stream.str());
       }
 
@@ -827,15 +982,18 @@ private:
       ResponseHeader header;
       in >> header;
       if ( Debug )std::cout << "binary_client| Got response id: " << id << " and handle " << header.RequestHandle<< std::endl;
+	  CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::Receive | Got response id: " << id << " and handle " << header.RequestHandle;
 
       if (header.ServiceResult != StatusCode::Good) {
         std::cout << "binary_client| Received a response from server with error status: " << OpcUa::ToString(header.ServiceResult) <<  std::endl;
+		CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::Receive | Received a response from server with error status: " << OpcUa::ToString(header.ServiceResult) << std::endl;
       }
 
       if (id == SERVICE_FAULT)
       {
         std::cerr << std::endl;
         std::cerr << "Receive ServiceFault from Server with StatusCode " << OpcUa::ToString(header.ServiceResult) << std::endl;
+		CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::Receive | Receive ServiceFault from Server with StatusCode " << OpcUa::ToString(header.ServiceResult) << std::endl;
         std::cerr << std::endl;
       }
       std::unique_lock<std::mutex> lock(Mutex);
@@ -843,6 +1001,7 @@ private:
       if (callbackIt == Callbacks.end())
       {
         std::cout << "binary_client| No callback found for message with id: " << id << " and handle " << header.RequestHandle << std::endl;
+		CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::Receive | No callback found for message with id: " << id << " and handle " << header.RequestHandle << std::endl;
         return;
       }
 	  callbackIt->second(std::move(buffer), std::move(header));
@@ -909,6 +1068,7 @@ private:
     // Remove this references to make ~BinaryClient() run possible
     void RemoveSelfReferences()
     {
+		CBOOST_LOG_SEV(mLogger, debug) << "BinaryClient::RemoveSelfReferences | Clearing cached references to server";
       if (Debug)  { std::cout << "binary_client| Clearing cached references to server" << std::endl; }
       PublishCallbacks.clear();
     }
@@ -933,7 +1093,7 @@ private:
     std::thread callback_thread;
     CallbackThread CallbackService;
     mutable std::mutex Mutex;
-
+	DECLARE_LOGGER
   };
 
   template <>

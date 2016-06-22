@@ -14,6 +14,7 @@
 #include <functional>
 #include <memory>
 #include <system_error>
+#include "logging.hpp"
 
 namespace OpcUa
 {
@@ -29,6 +30,7 @@ namespace OpcUa
 
   public:
     virtual void Stop() = 0;
+	DECLARE_LOGGER
   };
 
 

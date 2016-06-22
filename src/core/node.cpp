@@ -80,7 +80,10 @@ namespace OpcUa
 
     std::vector<std::vector<Variant>> results = CallMethods(vec_methodId, vec_inputArguments);
 
+	if (results.size())
     return results.front();
+	else
+		return std::vector<Variant>();
   }
 
   std::vector<std::vector<Variant>> Node::CallMethods(const std::vector<NodeId> methodIds, const std::vector<std::vector<Variant>> inputArguments) const
@@ -120,7 +123,10 @@ namespace OpcUa
     attribute.AttributeId = attr;
     attribute.Value = dval;
     std::vector<StatusCode> codes = Server->Attributes()->Write(std::vector<WriteValue>(1, attribute));
+	if (codes.size())
     CheckStatusCode(codes.front());
+	else
+		CheckStatusCode(StatusCode::BadAttributeIdInvalid);
   }
 
   void Node::SetValue(const Variant& val) const
@@ -232,6 +238,9 @@ namespace OpcUa
     params.BrowsePaths = bpaths;
 
     std::vector<BrowsePathResult> result = Server->Views()->TranslateBrowsePathsToNodeIds(params);
+	if (!result.size())
+		throw std::runtime_error(OpcUa::ToString(StatusCode::BadDataUnavailable));
+
     CheckStatusCode(result.front().Status);
 
     NodeId node =result.front().Targets.front().Node ;
