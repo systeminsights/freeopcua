@@ -75,6 +75,29 @@ void OpcUa::SocketChannel::Send(const char* message, std::size_t size)
   int sent = send(Socket, message, size, 0);
   if (sent != (int)size)
   {
+#ifdef WIN32
+		int iErrorCode = WSAGetLastError();
+		LPTSTR errorText = NULL;
+		char sMsg[512] = "\0";
+
+		sprintf(sMsg, "Unable to send data to the host.");
+		FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_IGNORE_INSERTS,
+			NULL,
+			iErrorCode,
+			MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+			(LPTSTR)&errorText,
+			0,
+			NULL);
+
+		if (NULL != errorText)
+		{
+			sprintf(sMsg, "Unable to send data to the host. recv(...) return code: %d, Last error code: %d, Error Message: %s", sent, iErrorCode, errorText);
+			LocalFree(errorText);
+			errorText = NULL;
+		}
+    THROW_OS_ERROR(sMsg);
+#else
     THROW_OS_ERROR("unable to send data to the host. ");
+#endif
   }
 }

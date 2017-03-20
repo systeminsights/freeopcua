@@ -59,6 +59,7 @@ namespace OpcUa
       params.SecurityMode = MessageSecurityMode::None;
       params.ClientNonce = std::vector<uint8_t>(1, 0);
       params.RequestLifeTime = Period;
+			try {
       OpenSecureChannelResponse response = Server->OpenSecureChannel(params);
       if ( (response.ChannelSecurityToken.RevisedLifetime < Period) && (response.ChannelSecurityToken.RevisedLifetime > 0) )
       {
@@ -67,6 +68,11 @@ namespace OpcUa
 
       if (Debug)  { std::cout << "KeepAliveThread | read a variable from address space to keep session open " << std::endl; }
       NodeToRead.GetValue();
+			}
+			catch (std::exception &e) 
+			{
+				StopRequest = true;
+			}
     }
     Running = false;
     if (Debug)
