@@ -931,7 +931,7 @@ private:
       RequestHeader header;
       header.SessionAuthenticationToken = AuthenticationToken;
       header.RequestHandle = GetRequestHandle();
-      header.Timeout = 10000;
+      header.Timeout = 60000;
       return header;
     }
 

@@ -61,11 +61,11 @@ std::size_t OpcUa::SocketChannel::Receive(char* data, std::size_t size)
   int received = recv(Socket, data, size, MSG_WAITALL);
   if (received < 0)
   {
-    THROW_OS_ERROR("Failed to receive data from host.");
+    throw std::runtime_error("Failed to receive data from host.");
   }
   if (received == 0)
   {
-    THROW_OS_ERROR("Connection was closed by host.");
+    throw std::runtime_error("Connection was closed by host.");
   }
   return (std::size_t)size;
 }
@@ -75,6 +75,6 @@ void OpcUa::SocketChannel::Send(const char* message, std::size_t size)
   int sent = send(Socket, message, size, 0);
   if (sent != (int)size)
   {
-    THROW_OS_ERROR("unable to send data to the host. ");
+    throw std::runtime_error("unable to send data to the host. ");
   }
 }

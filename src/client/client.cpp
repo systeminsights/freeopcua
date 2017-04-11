@@ -48,10 +48,10 @@ namespace OpcUa
       if (Debug)  { std::cout << "KeepAliveThread | Sleeping for: " << (int64_t) ( Period * 0.7 )<< std::endl; }
       std::unique_lock<std::mutex> lock(Mutex);
       std::cv_status status = Condition.wait_for(lock, std::chrono::milliseconds( (int64_t) ( Period * 0.7) ));
-      if (status == std::cv_status::no_timeout )
-      {
-        break;
-      }
+      //if (status == std::cv_status::no_timeout )
+      //{
+      //  break;
+      //}
       if (Debug)  { std::cout << "KeepAliveThread | renewing secure channel " << std::endl; }
       OpenSecureChannelParameters params;
       params.ClientProtocolVersion = 0;
@@ -59,14 +59,19 @@ namespace OpcUa
       params.SecurityMode = MessageSecurityMode::None;
       params.ClientNonce = std::vector<uint8_t>(1, 0);
       params.RequestLifeTime = Period;
-      OpenSecureChannelResponse response = Server->OpenSecureChannel(params);
-      if ( (response.ChannelSecurityToken.RevisedLifetime < Period) && (response.ChannelSecurityToken.RevisedLifetime > 0) )
-      {
-        Period = response.ChannelSecurityToken.RevisedLifetime;
+      try {
+        OpenSecureChannelResponse response = Server->OpenSecureChannel(params);
+        if ((response.ChannelSecurityToken.RevisedLifetime < Period) && (response.ChannelSecurityToken.RevisedLifetime > 0))
+        {
+          Period = response.ChannelSecurityToken.RevisedLifetime;
+        }
+      }
+      catch (...) {
+
       }
 
       if (Debug)  { std::cout << "KeepAliveThread | read a variable from address space to keep session open " << std::endl; }
-      NodeToRead.GetValue();
+      //NodeToRead.GetValue();
     }
     Running = false;
     if (Debug)
